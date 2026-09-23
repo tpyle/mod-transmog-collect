@@ -1,0 +1,41 @@
+[worldserver]
+
+###################################################################################################
+# TRANSMOG COLLECT
+#
+#    mod-transmog's collection unlocks an appearance when an item is looted,
+#    equipped, crafted, bought or handed over as a quest reward. Two ways of
+#    parting with a piece of gear are not on that list, and they are the two
+#    that happen most often to gear you do not intend to keep: selling it to a
+#    vendor and disenchanting it. Both destroy the item, so the appearance is
+#    gone for good unless it is recorded on the way out.
+#
+#    This module records it, through the same Transmogrification::AddToDatabase
+#    that mod-transmog's own hooks use - so the quality, armour type and
+#    "unusable items" rules, the account-wide dedupe, the chat notice and the
+#    custom_unlocked_appearances row are all exactly as they would be for an
+#    appearance collected any other way. mod-transmog does the work; this only
+#    tells it about two more moments.
+#
+#    Requires Transmogrification.UseCollectionSystem = 1 in transmog.conf.
+#
+#    TransmogCollect.Enable
+#        Description: Enable the module.
+#        Default:     1
+#
+#    TransmogCollect.OnSell
+#        Description: Collect the appearance of gear sold to a vendor. The item
+#                     is recorded when the sale is authorised, so it counts even
+#                     though the item is then gone (it can still be bought back
+#                     from the vendor's buyback slots as usual).
+#        Default:     1
+#
+#    TransmogCollect.OnDisenchant
+#        Description: Collect the appearance of gear that is disenchanted,
+#                     recorded when the disenchant loot window opens.
+#        Default:     1
+#
+
+TransmogCollect.Enable = 1
+TransmogCollect.OnSell = 1
+TransmogCollect.OnDisenchant = 1
