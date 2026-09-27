@@ -35,9 +35,11 @@
  */
 
 #include "Config.h"
+#include "Group.h"
 #include "Item.h"
 #include "ItemTemplate.h"
 #include "LootMgr.h"
+#include "ObjectMgr.h"
 #include "Player.h"
 #include "ScriptMgr.h"
 #include "Transmogrification.h"
@@ -60,18 +62,24 @@ namespace
         cfg.OnDisenchant = sConfigMgr->GetOption<bool>("TransmogCollect.OnDisenchant", true);
     }
 
-    // Hand the item to mod-transmog, which decides whether it is collectable
-    // and whether the account already has it.
-    void Collect(Player* player, Item const* item)
+    // Hand the template to mod-transmog, which decides whether it is
+    // collectable and whether the account already has it.
+    void CollectEntry(Player* player, uint32 itemEntry)
     {
-        if (!player || !item)
+        if (!player || !itemEntry)
             return;
 
         if (!sTransmogrification->GetUseCollectionSystem())
             return;
 
-        if (ItemTemplate const* proto = item->GetTemplate())
+        if (ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemEntry))
             sTransmogrification->AddToDatabase(player, proto);
+    }
+
+    void Collect(Player* player, Item const* item)
+    {
+        if (item)
+            CollectEntry(player, item->GetEntry());
     }
 }
 
@@ -91,7 +99,8 @@ class TransmogCollect_PlayerScript : public PlayerScript
 {
 public:
     TransmogCollect_PlayerScript() : PlayerScript("TransmogCollect_PlayerScript",
-        { PLAYERHOOK_CAN_SELL_ITEM, PLAYERHOOK_ON_BEFORE_SEND_LOOT }) { }
+        { PLAYERHOOK_CAN_SELL_ITEM, PLAYERHOOK_ON_BEFORE_SEND_LOOT,
+          PLAYERHOOK_ON_GROUP_ROLL_REWARD_ITEM }) { }
 
     // Returning true here only means "the sale may go ahead", which is what
     // every other implementation of this hook returns; the collection is the
@@ -117,6 +126,36 @@ public:
             return;
 
         Collect(player, player->GetItemByGuid(lootGuid));
+    }
+
+    // Winning a *roll* to disenchant never goes through SendLoot: Group.cpp
+    // marks the item looted in the corpse and hands over only the materials,
+    // so the item never exists in anybody's bags and the hook above cannot
+    // see it. This is the same event reported through the roll hook, where
+    // the item pointer is null for a disenchant and roll->itemid identifies
+    // what was destroyed.
+    //
+    // Need and greed wins are collected here too. They arrive as a real item
+    // and would eventually be collected on equip - or on being vendored, now
+    // - but an appearance the player won outright should not wait for that.
+    void OnPlayerGroupRollRewardItem(Player* player, Item* item, uint32 /*count*/,
+                                    RollVote voteType, Roll* roll) override
+    {
+        if (!cfg.Enable)
+            return;
+
+        if (voteType == DISENCHANT)
+        {
+            if (cfg.OnDisenchant && roll)
+                CollectEntry(player, roll->itemid);
+
+            return;
+        }
+
+        if (item)
+            Collect(player, item);
+        else if (roll)
+            CollectEntry(player, roll->itemid);
     }
 };
 
